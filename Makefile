@@ -12,7 +12,7 @@ SDK = sdk
 APP_FILE_NAME = ring
 
 INCLUDES = -I "$(SDK)/include" -I "src/include" -I "src/ResID" -I "src" -I "src/ring/include"
-DEFINES = -D _MINIGUI_LIB_ -D _USE_MINIGUIENTRY -D _NOUNIX_ -D _FOR_WNC -D __MRE_SDK__ -D __MRE_VENUS_NORMAL__ -D __MMI_MAINLCD_240X320__ -D MRE -D GCC -D __MRE_COMPILER_GCC__
+DEFINES = -D _MINIGUI_LIB_ -D _USE_MINIGUIENTRY -D _NOUNIX_ -D _FOR_WNC -D __MRE_SDK__ -D __MRE_VENUS_NORMAL__ -D __MMI_MAINLCD_240X320__ -D MRE -D GCC -D __MRE_COMPILER_GCC__ -D RING_VM_MRE=1
 
 SHARED_PARAM = -c -fpic -march=armv5te -fvisibility=hidden -Os -mlittle-endian $(INCLUDES) $(DEFINES) -fdata-sections -ffunction-sections
 GCC_PARAM = $(SHARED_PARAM)
@@ -39,8 +39,12 @@ build/%.o: src/%.cpp
 build/$(APP_FILE_NAME).axf: $(patsubst src/%.c,build/%.o,$(wildcard src/*.c)) $(patsubst src/ring/src/%.c,build/%.o,$(wildcard src/ring/src/*.c)) $(patsubst src/%.cpp,build/%.o,$(wildcard src/*.cpp))
 	$(GPP) -o $@ $^ $(LINK_LIB) $(LINK_PARAM)
 
-# 3. Add resources
-build/$(APP_FILE_NAME).vxp: build/$(APP_FILE_NAME).axf
+# 3. Strip
+build/$(APP_FILE_NAME)_stripped.axf: build/$(APP_FILE_NAME).axf
+	arm-none-eabi-strip --strip-unneeded $^ -o $@
+
+# 4. Add resources
+build/$(APP_FILE_NAME).vxp: build/$(APP_FILE_NAME)_stripped.axf
 	$(OBJCOPY) -I elf32-little --add-section .vm_res=$(SDK)/resource.bin $^ $@
 
 # 4. Add tags
