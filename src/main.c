@@ -1,4 +1,3 @@
-#define STB_DS_IMPLEMENTATION
 #include "common.h"
 
 /* ---------------------------------------------------------------------------
@@ -145,14 +144,16 @@ static void draw_running_state(void) {
 		return;
 	}
 
+	color.vm_color_565 = BG_COLOR;
+	vm_graphic_setcolor(&color);
 	vm_graphic_fill_rect_ex(layer_hdl[0], 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	color.vm_color_565 = MAIN_COLOR;
+	color.vm_color_565 = ACCENT_COLOR;
 	vm_graphic_setcolor(&color);
 	vm_graphic_fill_rect_ex(layer_hdl[0], 0, SCREEN_HEIGHT - HINT_BAR_HEIGHT,
 							SCREEN_WIDTH, HINT_BAR_HEIGHT);
 
-	color.vm_color_565 = VM_COLOR_WHITE;
+	color.vm_color_565 = TEXT_COLOR;
 	vm_graphic_setcolor(&color);
 	vm_ascii_to_ucs2(ucs2_str, sizeof(ucs2_str) / sizeof(VMWCHAR), "Back");
 	int hint_text_y = SCREEN_HEIGHT - HINT_BAR_HEIGHT +
@@ -181,7 +182,7 @@ static VMBOOL execute_script(const char *script_path) {
 	if (strlen(script_path) == 0) {
 		log_write("Cannot run script: No script selected.");
 		vm_ascii_to_ucs2(ucs2_str, 128, (VMSTR) "No script selected.");
-		color.vm_color_565 = VM_COLOR_RED;
+		color.vm_color_565 = ERROR_COLOR;
 		vm_graphic_setcolor(&color);
 		int text_x = (SCREEN_WIDTH - vm_graphic_get_string_width(ucs2_str)) / 2;
 		int text_y = (SCREEN_HEIGHT - HINT_BAR_HEIGHT -
@@ -200,7 +201,7 @@ static VMBOOL execute_script(const char *script_path) {
 	if (!pRingState) {
 		log_write("Failed to initialize Ring state!");
 		vm_ascii_to_ucs2(ucs2_str, 128, (VMSTR) "Ring init failed!");
-		color.vm_color_565 = VM_COLOR_RED;
+		color.vm_color_565 = ERROR_COLOR;
 		vm_graphic_setcolor(&color);
 		int text_x = (SCREEN_WIDTH - vm_graphic_get_string_width(ucs2_str)) / 2;
 		int text_y = (SCREEN_HEIGHT - HINT_BAR_HEIGHT -
@@ -263,7 +264,7 @@ static VMBOOL execute_script(const char *script_path) {
 	}
 
 	if (!script_ok) {
-		color.vm_color_565 = VM_COLOR_RED;
+		color.vm_color_565 = ERROR_COLOR;
 		vm_graphic_setcolor(&color);
 		int text_x = (SCREEN_WIDTH - vm_graphic_get_string_width(ucs2_str)) / 2;
 		int text_y = (SCREEN_HEIGHT - HINT_BAR_HEIGHT -

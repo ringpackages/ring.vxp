@@ -10,15 +10,15 @@ void draw_menu() {
 	if (layer_hdl[0] == -1)
 		return;
 
-	color.vm_color_565 = VM_COLOR_BLACK;
+	color.vm_color_565 = BG_COLOR;
 	vm_graphic_setcolor(&color);
 	vm_graphic_fill_rect_ex(layer_hdl[0], 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	color.vm_color_565 = MAIN_COLOR;
+	color.vm_color_565 = ACCENT_COLOR;
 	vm_graphic_setcolor(&color);
 	vm_graphic_fill_rect_ex(layer_hdl[0], 0, 0, SCREEN_WIDTH, TITLE_HEIGHT);
 
-	color.vm_color_565 = VM_COLOR_WHITE;
+	color.vm_color_565 = TEXT_COLOR;
 	vm_graphic_setcolor(&color);
 	char title_str[32];
 	switch (menu) {
@@ -80,14 +80,14 @@ void draw_menu() {
 			row_y_start + (row_height - vm_graphic_get_character_height()) / 2;
 
 		if (item_index == menu_choice) {
-			color.vm_color_565 = MAIN_COLOR;
+			color.vm_color_565 = ACCENT_COLOR;
 			vm_graphic_setcolor(&color);
 			vm_graphic_fill_rect_ex(layer_hdl[0], 0, row_y_start, SCREEN_WIDTH,
 									row_height);
-			color.vm_color_565 = VM_COLOR_WHITE;
+			color.vm_color_565 = TEXT_COLOR;
 			vm_graphic_setcolor(&color);
 		} else {
-			color.vm_color_565 = VM_COLOR_WHITE;
+			color.vm_color_565 = TEXT_DIM_COLOR;
 			vm_graphic_setcolor(&color);
 		}
 
@@ -97,7 +97,7 @@ void draw_menu() {
 	}
 
 	if (total_items > items_on_screen) {
-		color.vm_color_565 = VM_COLOR_WHITE;
+		color.vm_color_565 = TEXT_DIM_COLOR;
 		vm_graphic_setcolor(&color);
 		if (first_item_index > 0) {
 			vm_ascii_to_ucs2(ucs2_str, 128, "^");
@@ -121,12 +121,12 @@ void draw_menu() {
 					   softkey_separator_y);
 
 	int softkey_y = SCREEN_HEIGHT - SOFTKEY_HEIGHT;
-	color.vm_color_565 = MAIN_COLOR;
+	color.vm_color_565 = ACCENT_COLOR;
 	vm_graphic_setcolor(&color);
 	vm_graphic_fill_rect_ex(layer_hdl[0], 0, softkey_y, SCREEN_WIDTH,
 							SOFTKEY_HEIGHT);
 
-	color.vm_color_565 = VM_COLOR_WHITE;
+	color.vm_color_565 = TEXT_COLOR;
 	vm_graphic_setcolor(&color);
 
 	VMWCHAR select_text[20], back_text[10];
@@ -287,7 +287,7 @@ void set_menu(Menu new_menu) {
 		arrput(menu_list, "Ring Embedded in MRE");
 		arrput(menu_list, "Version: " RING_VXP_VERSION);
 		arrput(menu_list, "RingVM: " RING_STATE_VERSION);
-		arrput(menu_list, "Copyright (C) 2025");
+		arrput(menu_list, "Copyright (C) 2026");
 		arrput(menu_list, "ysdragon");
 		arrput(menu_list, "github.com/ysdragon");
 

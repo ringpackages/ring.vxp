@@ -15,7 +15,7 @@
 
 #include "editor.h"
 #include "ring.h"
-#include "stb_ds.h"
+#include "darr.h"
 #include "util.h"
 #include "menu.h"
 
@@ -25,7 +25,7 @@ typedef enum State {
 	ST_EDITOR,
 } State;
 
-#define RING_VXP_VERSION "1.2"
+#define RING_VXP_VERSION "1.3"
 
 #define RING_DIR "e:\\ring\\"
 
@@ -33,8 +33,13 @@ typedef enum State {
 #define TITLE_HEIGHT 18
 #define SOFTKEY_HEIGHT 18
 
-#define MAIN_COLOR MRE_RGB(45, 84, 203)
-#define SEPARATOR_COLOR MRE_RGB(128, 128, 128)
+#define BG_COLOR MRE_RGB(18, 24, 31)
+#define ACCENT_COLOR MRE_RGB(59, 130, 246)
+#define MAIN_COLOR ACCENT_COLOR
+#define TEXT_COLOR MRE_RGB(236, 242, 248)
+#define TEXT_DIM_COLOR MRE_RGB(166, 178, 190)
+#define ERROR_COLOR MRE_RGB(225, 95, 95)
+#define SEPARATOR_COLOR MRE_RGB(58, 70, 82)
 
 #define MRE_RGB(r, g, b)                                                       \
 	(VMUINT16)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3))
