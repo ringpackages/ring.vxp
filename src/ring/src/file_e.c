@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2025 Mahmoud Fayed <msfclipper@yahoo.com> */
+/* Copyright (c) 2013-2026 Mahmoud Fayed <msfclipper@yahoo.com> */
 
 #include "ring.h"
 
@@ -7,7 +7,9 @@ void ring_vm_file_loadfunctions(RingState *pRingState) {
 	RING_API_REGISTER("fclose", ring_vm_file_fclose);
 	RING_API_REGISTER("fflush", ring_vm_file_fflush);
 	RING_API_REGISTER("freopen", ring_vm_file_freopen);
-	// RING_API_REGISTER("tempfile", ring_vm_file_tempfile);
+	#if !RING_VM_MRE
+	RING_API_REGISTER("tempfile", ring_vm_file_tempfile);
+#endif
 	RING_API_REGISTER("fseek", ring_vm_file_fseek);
 	RING_API_REGISTER("ftell", ring_vm_file_ftell);
 	RING_API_REGISTER("rewind", ring_vm_file_rewind);
@@ -17,8 +19,10 @@ void ring_vm_file_loadfunctions(RingState *pRingState) {
 	RING_API_REGISTER("feof", ring_vm_file_feof);
 	RING_API_REGISTER("ferror", ring_vm_file_ferror);
 	RING_API_REGISTER("perror", ring_vm_file_perror);
-	// RING_API_REGISTER("rename", ring_vm_file_rename);
-	// RING_API_REGISTER("remove", ring_vm_file_remove);
+	#if !RING_VM_MRE
+	RING_API_REGISTER("rename", ring_vm_file_rename);
+	RING_API_REGISTER("remove", ring_vm_file_remove);
+#endif
 	RING_API_REGISTER("fgetc", ring_vm_file_fgetc);
 	RING_API_REGISTER("fgets", ring_vm_file_fgets);
 	RING_API_REGISTER("fputc", ring_vm_file_fputc);
@@ -112,13 +116,11 @@ void ring_vm_file_freopen(void *pPointer) {
 	}
 }
 
-/*
 void ring_vm_file_tempfile(void *pPointer) {
 	FILE *pFile;
 	pFile = tmpfile();
 	RING_API_RETMANAGEDCPOINTER(pFile, RING_VM_POINTER_FILE, ring_vm_file_freefunc);
 }
-*/
 
 void ring_vm_file_fseek(void *pPointer) {
 	int nResult;
@@ -274,7 +276,6 @@ void ring_vm_file_perror(void *pPointer) {
 	}
 }
 
-/*
 void ring_vm_file_rename(void *pPointer) {
 	if (RING_API_PARACOUNT != 2) {
 		RING_API_ERROR(RING_API_MISS2PARA);
@@ -286,8 +287,7 @@ void ring_vm_file_rename(void *pPointer) {
 		RING_API_ERROR(RING_API_BADPARATYPE);
 	}
 }
-*/
-/*
+
 void ring_vm_file_remove(void *pPointer) {
 	if (RING_API_PARACOUNT != 1) {
 		RING_API_ERROR(RING_API_MISS2PARA);
@@ -299,7 +299,6 @@ void ring_vm_file_remove(void *pPointer) {
 		RING_API_ERROR(RING_API_BADPARATYPE);
 	}
 }
-*/
 
 void ring_vm_file_fgetc(void *pPointer) {
 	int c;
@@ -477,6 +476,7 @@ void ring_vm_file_fwrite(void *pPointer) {
 void ring_vm_file_read(void *pPointer) {
 	FILE *pFile;
 	long int nSize;
+	size_t nCount;
 	char *cBuffer;
 	if (RING_API_PARACOUNT != 1) {
 		RING_API_ERROR(RING_API_MISS1PARA);
@@ -490,10 +490,20 @@ void ring_vm_file_read(void *pPointer) {
 		}
 		fseek(pFile, 0, SEEK_END);
 		nSize = ftell(pFile);
+		if (nSize == -1) {
+			fclose(pFile);
+			RING_API_ERROR(RING_CANTREADFILE);
+			return;
+		}
 		fseek(pFile, 0, SEEK_SET);
 		RING_API_RETSTRINGSIZE(nSize);
 		cBuffer = ring_string_get(RING_API_GETSTRINGRAW);
-		fread(cBuffer, 1, nSize, pFile);
+		nCount = fread(cBuffer, 1, nSize, pFile);
+		if (nCount != nSize) {
+			fclose(pFile);
+			RING_API_ERROR(RING_CANTREADFILE);
+			return;
+		}
 		fclose(pFile);
 	} else {
 		RING_API_ERROR(RING_API_BADPARATYPE);

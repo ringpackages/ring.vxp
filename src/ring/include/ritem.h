@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2025 Mahmoud Fayed <msfclipper@yahoo.com> */
+/* Copyright (c) 2013-2026 Mahmoud Fayed <msfclipper@yahoo.com> */
 
 #ifndef ring_item_h
 #define ring_item_h
@@ -27,6 +27,7 @@ typedef struct Item {
 	unsigned int lAssignment : 1;
 	/* Garbage Collector Data (Reference Counting) */
 	unsigned int nGCReferenceCount : RING_VM_BITSFORREFCOUNT;
+	unsigned int lUnusedFlag : 1;
 	void (*pGCFreeFunc)(void *, void *);
 } Item;
 /* Constants */

@@ -1,8 +1,8 @@
-/* Copyright (c) 2013-2025 Mahmoud Fayed <msfclipper@yahoo.com> */
+/* Copyright (c) 2013-2026 Mahmoud Fayed <msfclipper@yahoo.com> */
 
 #ifndef ring_vmgcdata
 #define ring_vmgcdata
-#define RING_VM_BITSFORREFCOUNT 24
+#define RING_VM_BITSFORREFCOUNT 23
 #define RING_VM_REFCOUNTMAX 8388607
 typedef struct ListGCData {
 	void *pContainer;
@@ -23,6 +23,8 @@ typedef struct ListGCData {
 	unsigned int lTrackedList : 1;
 	unsigned int lArgCache : 1;
 	unsigned int nListType : 3;
+	unsigned int lVisitedFlag1 : 1;
+	unsigned int lVisitedFlag2 : 1;
 	unsigned int lUnusedFlag : 1;
 } ListGCData;
 #endif

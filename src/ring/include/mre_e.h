@@ -25,4 +25,7 @@ void ring_mre_date(void *pPointer);
 
 void ring_mre_memory_size(void *pPointer);
 
+void ring_mre_uptime(void *pPointer);
+void ring_mre_randomize(void *pPointer);
+
 #endif

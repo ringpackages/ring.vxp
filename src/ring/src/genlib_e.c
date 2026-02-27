@@ -1,4 +1,4 @@
-/* Copyright (c) 2013-2025 Mahmoud Fayed <msfclipper@yahoo.com> */
+/* Copyright (c) 2013-2026 Mahmoud Fayed <msfclipper@yahoo.com> */
 
 #include "ring.h"
 
@@ -39,12 +39,18 @@ RING_API void ring_vm_generallib_loadfunctions(RingState *pRingState) {
 	RING_API_REGISTER("strcmp", ring_vm_generallib_strcmp);
 	RING_API_REGISTER("len", ring_vm_generallib_len);
 	/* Eval */
+#if !RING_VM_MRE
 	RING_API_REGISTER("eval", ring_vm_generallib_eval);
+#endif
 	/* Error Handling */
+#if !RING_VM_MRE
 	RING_API_REGISTER("raise", ring_vm_generallib_raise);
+#endif
 	RING_API_REGISTER("assert", ring_vm_generallib_assert);
 	RING_API_REGISTER("filename", ring_vm_generallib_filename);
+#if !RING_VM_MRE
 	RING_API_REGISTER("prevfilename", ring_vm_generallib_prevfilename);
+#endif
 	/* Check Characters */
 	RING_API_REGISTER("isalnum", ring_vm_generallib_isalnum);
 	RING_API_REGISTER("isalpha", ring_vm_generallib_isalpha);
@@ -80,7 +86,8 @@ RING_API void ring_vm_generallib_loadfunctions(RingState *pRingState) {
 	RING_API_REGISTER("setptr", ring_vm_generallib_setpointer);
 	RING_API_REGISTER("getptr", ring_vm_generallib_getpointer);
 	RING_API_REGISTER("memorycopy", ring_vm_generallib_memcpy);
-	/* Ring State 
+	/* Ring State */
+#if !RING_VM_MRE
 	RING_API_REGISTER("ring_state_init", ring_vm_generallib_state_init);
 	RING_API_REGISTER("ring_state_runcode", ring_vm_generallib_state_runcode);
 	RING_API_REGISTER("ring_state_delete", ring_vm_generallib_state_delete);
@@ -97,7 +104,7 @@ RING_API void ring_vm_generallib_loadfunctions(RingState *pRingState) {
 	RING_API_REGISTER("ring_state_scannererror", ring_vm_generallib_state_scannererror);
 	RING_API_REGISTER("ring_state_runcodeatins", ring_vm_generallib_state_runcodeatins);
 	RING_API_REGISTER("ring_state_resume", ring_vm_generallib_state_resume);
-	*/
+#endif
 	/*
 	**  Ring Input/Output
 	**  We will use ringvm_see() and ringvm_give() to change the behavior of see and give
@@ -115,13 +122,15 @@ RING_API void ring_vm_generallib_loadfunctions(RingState *pRingState) {
 	RING_API_REGISTER("input", ring_vm_generallib_input);
 	RING_API_REGISTER("getchar", ring_vm_generallib_getchar);
 	/* Date and Time */
-	// RING_API_REGISTER("clock", ring_vm_generallib_clock);
-	// RING_API_REGISTER("clockspersecond", ring_vm_generallib_clockspersecond);
-	// RING_API_REGISTER("time", ring_vm_generallib_time);
-	// RING_API_REGISTER("timelist", ring_vm_generallib_timelist);
-	// RING_API_REGISTER("date", ring_vm_generallib_date);
-	// RING_API_REGISTER("adddays", ring_vm_generallib_adddays);
-	// RING_API_REGISTER("diffdays", ring_vm_generallib_diffdays);
+#if !RING_VM_MRE
+	RING_API_REGISTER("clock", ring_vm_generallib_clock);
+	RING_API_REGISTER("clockspersecond", ring_vm_generallib_clockspersecond);
+	RING_API_REGISTER("time", ring_vm_generallib_time);
+	RING_API_REGISTER("timelist", ring_vm_generallib_timelist);
+	RING_API_REGISTER("date", ring_vm_generallib_date);
+	RING_API_REGISTER("adddays", ring_vm_generallib_adddays);
+	RING_API_REGISTER("diffdays", ring_vm_generallib_diffdays);
+#endif
 }
 /* General */
 
@@ -698,6 +707,8 @@ void ring_vm_generallib_left(void *pPointer) {
 				RING_API_RETSTRINGSIZE(nNewSize);
 				cString = ring_string_get(RING_API_GETSTRINGRAW);
 				RING_MEMCPY(cString, cStr, nNewSize);
+			} else if (nNum1 > RING_API_GETSTRINGSIZE(1)) {
+				RING_API_RETSTRING2(RING_API_GETSTRING(1), RING_API_GETSTRINGSIZE(1));
 			}
 		} else {
 			RING_API_ERROR(RING_API_BADPARATYPE);
@@ -728,6 +739,8 @@ void ring_vm_generallib_right(void *pPointer) {
 				RING_API_RETSTRINGSIZE(nNewSize);
 				cString = ring_string_get(RING_API_GETSTRINGRAW);
 				RING_MEMCPY(cString, cStr + (nSize - nNewSize), nNewSize);
+			} else if (nNum1 > nSize) {
+				RING_API_RETSTRING2(cStr, nSize);
 			}
 		} else {
 			RING_API_ERROR(RING_API_BADPARATYPE);
@@ -880,7 +893,10 @@ void ring_vm_generallib_substr(void *pPointer) {
 			nNum1 = RING_API_GETNUMBER(2);
 			nNum2 = RING_API_GETNUMBER(3);
 			if ((nNum1 > 0) && (nNum1 <= nSize)) {
-				if ((nNum2 > 0) && ((nNum1 + nNum2 - 1) <= nSize)) {
+				if (nNum2 > 0) {
+					if ((nNum1 + nNum2 - 1) > nSize) {
+						nNum2 = nSize - nNum1 + 1;
+					}
 					RING_API_RETSTRINGSIZE(nNum2);
 					cString = ring_string_get(RING_API_GETSTRINGRAW);
 					for (x = 0; x < nNum2; x++) {
@@ -2221,6 +2237,8 @@ void ring_vm_generallib_diffdays(void *pPointer) {
 	time_t vTimer, vTimer2;
 	char cBuffer[RING_SMALLBUF];
 	double nResult;
+	memset(&vTimeInfo, 0, sizeof(struct tm));
+	memset(&vTimeInfo2, 0, sizeof(struct tm));
 	if (RING_API_PARACOUNT != 2) {
 		RING_API_ERROR(RING_API_BADPARACOUNT);
 		return;
@@ -2232,8 +2250,8 @@ void ring_vm_generallib_diffdays(void *pPointer) {
 	cStr = (const unsigned char *)RING_API_GETSTRING(1);
 	cStr2 = (const unsigned char *)RING_API_GETSTRING(2);
 	if ((RING_API_GETSTRINGSIZE(1) == 10) && (RING_API_GETSTRINGSIZE(2) == 10)) {
-		if (isalnum(cStr[0]) && isalnum(cStr[1]) && isalnum(cStr[3]) && isalnum(cStr[4]) && isalnum(cStr[6]) &&
-		    isalnum(cStr[7]) && isalnum(cStr[8]) && isalnum(cStr[9])) {
+		if (isdigit(cStr[0]) && isdigit(cStr[1]) && isdigit(cStr[3]) && isdigit(cStr[4]) && isdigit(cStr[6]) &&
+		    isdigit(cStr[7]) && isdigit(cStr[8]) && isdigit(cStr[9])) {
 			vTimeInfo.tm_hour = 0;
 			vTimeInfo.tm_min = 0;
 			vTimeInfo.tm_sec = 0;
@@ -2244,7 +2262,7 @@ void ring_vm_generallib_diffdays(void *pPointer) {
 			sprintf(cBuffer, "%c%c%c%c", cStr[6], cStr[7], cStr[8], cStr[9]);
 			vTimeInfo.tm_year = atoi(cBuffer) - 1900;
 			vTimer = mktime(&vTimeInfo);
-			if (vTimeInfo.tm_year > 1097) {
+			if ((vTimer == (time_t)-1) || (vTimeInfo.tm_year > 1097)) {
 				/*
 				**  1097 + 1900 = 2997
 				**  Values over limit may cause crash
@@ -2252,8 +2270,8 @@ void ring_vm_generallib_diffdays(void *pPointer) {
 				RING_API_ERROR(RING_API_BADPARARANGE);
 				return;
 			}
-			if (isalnum(cStr2[0]) && isalnum(cStr2[1]) && isalnum(cStr2[3]) && isalnum(cStr2[4]) &&
-			    isalnum(cStr2[6]) && isalnum(cStr2[7]) && isalnum(cStr2[8]) && isalnum(cStr2[9])) {
+			if (isdigit(cStr2[0]) && isdigit(cStr2[1]) && isdigit(cStr2[3]) && isdigit(cStr2[4]) &&
+			    isdigit(cStr2[6]) && isdigit(cStr2[7]) && isdigit(cStr2[8]) && isdigit(cStr2[9])) {
 				vTimeInfo2.tm_hour = 0;
 				vTimeInfo2.tm_min = 0;
 				vTimeInfo2.tm_sec = 0;
@@ -2264,7 +2282,7 @@ void ring_vm_generallib_diffdays(void *pPointer) {
 				sprintf(cBuffer, "%c%c%c%c", cStr2[6], cStr2[7], cStr2[8], cStr2[9]);
 				vTimeInfo2.tm_year = atoi(cBuffer) - 1900;
 				vTimer2 = mktime(&vTimeInfo2);
-				if (vTimeInfo2.tm_year > 1097) {
+				if ((vTimer == (time_t)-1) || (vTimeInfo2.tm_year > 1097)) {
 					/*
 					**  1097 + 1900 = 2997
 					**  Values over limit may cause crash

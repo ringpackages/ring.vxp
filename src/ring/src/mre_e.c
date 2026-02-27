@@ -22,6 +22,9 @@ void ring_vm_mre_loadfunctions(RingState *pRingState)
 	RING_API_REGISTER("clockspersecond", ring_mre_clockspersecond);
 	RING_API_REGISTER("time", ring_mre_time);
 	RING_API_REGISTER("date", ring_mre_date);
+
+	RING_API_REGISTER("uptime", ring_mre_uptime);
+	RING_API_REGISTER("randomize", ring_mre_randomize);
 }
 
 void ring_mre_draw_text(void *pPointer)
@@ -391,4 +394,14 @@ void ring_mre_memory_size(void *pPointer)
 	}
 	VMUINT memorySize = vm_get_mre_total_mem_size();
 	RING_API_RETNUMBER(memorySize);
+}
+
+void ring_mre_uptime(void *pPointer)
+{
+	RING_API_RETNUMBER((double)vm_get_tick_count());
+}
+
+void ring_mre_randomize(void *pPointer)
+{
+	srand(vm_get_tick_count());
 }
