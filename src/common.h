@@ -25,7 +25,7 @@ typedef enum State {
 	ST_EDITOR,
 } State;
 
-#define RING_VXP_VERSION "1.3"
+#define RING_VXP_VERSION "1.4"
 
 #define RING_DIR "e:\\ring\\"
 
