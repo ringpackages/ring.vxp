@@ -1,217 +1,188 @@
 # Patching Ring for MRE
 
-This document describes all modifications needed to build Ring on MRE (MediaTek Runtime Environment) devices like Nokia 225.
+## 1. `src/ring/include/rconfig.h`
 
-## Architecture
-
-MRE configuration is split into two layers:
-
-1. **`rconfig.h`** — All preprocessor flag overrides. Ring ships this file empty, so it's never touched by upstream updates. This is where most MRE customization lives.
-2. **Small `#if` patches** in 4 upstream files — Minimal guards around code that can't be disabled via flags alone.
-
-The only compiler define needed is `-D RING_VM_MRE=1` (in the Makefile). Everything else is derived from it inside `rconfig.h`.
-
-## Quick Start
-
-```bash
-# 1. Copy new Ring source files (overwrites everything except rconfig.h)
-cp ringsrc/language/src/*.c src/ring/src/
-cp ringsrc/language/include/*.h src/ring/include/
-
-# 2. Restore rconfig.h (step 1 overwrites it with upstream's empty version)
-git checkout src/ring/include/rconfig.h
-
-# 3. Re-apply patches 2–5 below
-
-# 4. Delete non-MRE source files (patch 6)
-rm src/ring/src/{dll_e.c,meta_e.c,vminfo_e.c,os_e.c,ring.c,ringw.c}
-
-# 5. Build
-make clean && make
-```
-
-## Patches
-
-### 1. `src/ring/include/rconfig.h` — MRE overrides (never needs re-patching)
-
-This file is the central MRE configuration. Upstream ships it empty, so it's never overwritten during updates — just restore it with `git checkout` after copying upstream files.
-
-```c
-/* Custom Configuration File (Could be modified when embedding Ring in other projects) */
-
-/*
- * MRE (MediaTek Runtime Environment) overrides
- * These are defined here instead of ring.h so updating Ring doesn't lose them.
- * rconfig.h is included before all other checks in ring.h, so these take effect
- * via the existing #ifndef / #if guards.
- */
-#ifdef RING_VM_MRE
-	#define RING_LIMITEDENV 1
-	#define RING_LIMITEDSYS 1
-	#define RING_VM_OS 0
-	#define RING_VM_REFMETA 0
-	#define RING_VM_INFO 0
-#endif
-```
-
-**What each flag does:**
-- `RING_LIMITEDENV` — Enables `RING_LOWMEM`, `RING_NODLL`, disables extras
-- `RING_LIMITEDSYS` — Disables `getcwd`/`chdir` (POSIX, unavailable on bare-metal)
-- `RING_VM_OS` — Disables `os_e.c` (POSIX shell, env vars, process control)
-- `RING_VM_REFMETA` — Disables `meta_e.c` (reflection, too much RAM)
-- `RING_VM_INFO` — Disables `vminfo_e.c` (VM info functions)
-
-### 2. `src/ring/include/ext.h` — Use `#ifndef` guards
-
-Change 3 unconditional `#define` lines to `#ifndef` so `rconfig.h` values take effect:
+Add the microcontroller define.
 
 ```diff
--#define RING_VM_OS 1
+ /* Custom Configuration File (Could be modified when embedding Ring in other projects) */
++
++#define RING_MICROCONTROLLER 1
+```
+
+## 2. `src/ring/include/ext.h`
+
+- Add `RING_VM_MRE 1`
+- Set `RING_VM_REFMETA` and `RING_VM_INFO` to `0`
+- Change `#if RING_NODLL` to `#if RING_LOWMEM`
+
+```diff
+ #ifndef ringext_h
+ #define ringext_h
++#define RING_VM_MRE 1
+ #define RING_VM_LISTFUNCS 1
+ #define RING_VM_MATH 1
+ #define RING_VM_FILE 1
+ #define RING_VM_OS 1
 -#define RING_VM_REFMETA 1
 -#define RING_VM_INFO 1
-+#ifndef RING_VM_OS
-+	#define RING_VM_OS 1
+-#if RING_NODLL
++#define RING_VM_REFMETA 0
++#define RING_VM_INFO 0
++#if RING_LOWMEM
+ 	#define RING_VM_DLL 0
+ #else
+ 	#define RING_VM_DLL 1
+```
+
+## 3. `src/ring/include/ring.h`
+
+Add the MRE extension header include after the `dll_e.h` block.
+
+```diff
+ 	#if RING_VM_DLL
+ 		#include "dll_e.h"
+ 	#endif
++	#if RING_VM_MRE
++		#include "mre_e.h"
++	#endif
+ #endif
+ #endif
+```
+
+## 4. `src/ring/src/ext.c`
+
+- Add the `ring_vm_mre_loadfunctions` call at the top of `ring_vm_extension`
+- Delete the `#if RING_VM_DLL / ring_vm_dll_loadfunctions` block
+
+```diff
+ void ring_vm_extension(RingState *pRingState) {
++#if RING_VM_MRE
++	ring_vm_mre_loadfunctions(pRingState);
 +#endif
-+#ifndef RING_VM_REFMETA
-+	#define RING_VM_REFMETA 1
-+#endif
-+#ifndef RING_VM_INFO
-+	#define RING_VM_INFO 1
-+#endif
+ /* List */
+ #if RING_VM_LISTFUNCS
+ 	ring_vm_list_loadfunctions(pRingState);
 ```
 
-**Why:** Without `#ifndef`, `ext.h` unconditionally sets these to `1`, overriding `rconfig.h`.
-
-### 3. `src/ring/include/ring.h` — Include MRE extension header
-
-At the end of the includes section (after the `#include "dll_e.h"` block), add:
-
-```c
-	#if RING_VM_MRE
-		#include "mre_e.h"
-	#endif
+```diff
+ #if RING_VM_OS
+ 	ring_vm_os_loadfunctions(pRingState);
+ #endif
+-/* DLL */
+-#if RING_VM_DLL
+-	ring_vm_dll_loadfunctions(pRingState);
+-#endif
+ /* Reflection and Meta-programming */
+ #if RING_VM_REFMETA
+ 	ring_vm_refmeta_loadfunctions(pRingState);
 ```
 
-**Why:** Loads MRE extension function declarations. Can't go in `rconfig.h` since it needs to be inside the header inclusion block.
+## 5. `src/ring/src/file_e.c`
 
-### 4. `src/ring/src/ext.c` — Load MRE functions
+Comment out the `tempfile`, `rename`, `remove` registrations:
 
-Inside `ring_vm_extension()`, add at the top (after the opening `{`):
-
-```c
-#if RING_VM_MRE
-	ring_vm_mre_loadfunctions(pRingState);
-#endif
+```diff
+ 	RING_API_REGISTER("freopen", ring_vm_file_freopen);
+-	RING_API_REGISTER("tempfile", ring_vm_file_tempfile);
++	// RING_API_REGISTER("tempfile", ring_vm_file_tempfile);
+ 	RING_API_REGISTER("fseek", ring_vm_file_fseek);
 ```
 
-**Why:** Registers MRE-specific functions (graphics, input, file I/O, etc.).
-
-### 5. `src/ring/src/genlib_e.c` — Disable unsupported functions
-
-Wrap these sections in `ring_vm_generallib_loadfunctions()` with `#if !RING_VM_MRE` / `#endif`:
-
-**eval** (compiles + runs code at runtime — too heavy for MRE RAM):
-```c
-#if !RING_VM_MRE
-	RING_API_REGISTER("eval", ring_vm_generallib_eval);
-#endif
+```diff
+ 	RING_API_REGISTER("perror", ring_vm_file_perror);
+-	RING_API_REGISTER("rename", ring_vm_file_rename);
+-	RING_API_REGISTER("remove", ring_vm_file_remove);
++	// RING_API_REGISTER("rename", ring_vm_file_rename);
++	// RING_API_REGISTER("remove", ring_vm_file_remove);
+ 	RING_API_REGISTER("fgetc", ring_vm_file_fgetc);
 ```
 
-**raise** and **prevfilename** (no POSIX signals or multi-file support):
-```c
-#if !RING_VM_MRE
-	RING_API_REGISTER("raise", ring_vm_generallib_raise);
-#endif
-	RING_API_REGISTER("assert", ring_vm_generallib_assert);
-	RING_API_REGISTER("filename", ring_vm_generallib_filename);
-#if !RING_VM_MRE
-	RING_API_REGISTER("prevfilename", ring_vm_generallib_prevfilename);
-#endif
+Comment out the function bodies:
+
+```diff
++/*
+ void ring_vm_file_tempfile(void *pPointer) {
+ 	FILE *pFile;
+ 	pFile = tmpfile();
+ 	RING_API_RETMANAGEDCPOINTER(pFile, RING_VM_POINTER_FILE, ring_vm_file_freefunc);
+ }
++*/
 ```
 
-**ring_state_\*** (sub-states not practical on MRE due to RAM) — wrap the entire block:
-```c
-#if !RING_VM_MRE
-	RING_API_REGISTER("ring_state_init", ring_vm_generallib_state_init);
-	... (all 16 ring_state_* lines) ...
-	RING_API_REGISTER("ring_state_resume", ring_vm_generallib_state_resume);
-#endif
+```diff
++/*
+ void ring_vm_file_rename(void *pPointer) {
+ 	...
+ }
++*/
++/*
+ void ring_vm_file_remove(void *pPointer) {
+ 	...
+ }
++*/
 ```
 
-**Date/Time** (MRE has no `clock()`, `time()`, `mktime()`, etc.):
-```c
-#if !RING_VM_MRE
-	RING_API_REGISTER("clock", ring_vm_generallib_clock);
-	... (all 7 date/time lines) ...
-	RING_API_REGISTER("diffdays", ring_vm_generallib_diffdays);
-#endif
+## 6. `src/ring/src/genlib_e.c`
+
+Comment out the `ring_state_*` block by removing the closing `*/` from `/* Ring State */` and adding `*/` after `ring_state_resume`:
+
+```diff
+-	/* Ring State */
++	/* Ring State
+ 	RING_API_REGISTER("ring_state_init", ring_vm_generallib_state_init);
+ 	RING_API_REGISTER("ring_state_runcode", ring_vm_generallib_state_runcode);
+ 	RING_API_REGISTER("ring_state_delete", ring_vm_generallib_state_delete);
+ 	RING_API_REGISTER("ring_state_runfile", ring_vm_generallib_state_runfile);
+ 	RING_API_REGISTER("ring_state_findvar", ring_vm_generallib_state_findvar);
+ 	RING_API_REGISTER("ring_state_newvar", ring_vm_generallib_state_newvar);
+ 	RING_API_REGISTER("ring_state_runobjectfile", ring_vm_generallib_state_runobjectfile);
+ 	RING_API_REGISTER("ring_state_main", ring_vm_generallib_state_main);
+ 	RING_API_REGISTER("ring_state_setvar", ring_vm_generallib_state_setvar);
+ 	RING_API_REGISTER("ring_state_new", ring_vm_generallib_state_new);
+ 	RING_API_REGISTER("ring_state_mainfile", ring_vm_generallib_state_mainfile);
+ 	RING_API_REGISTER("ring_state_filetokens", ring_vm_generallib_state_filetokens);
+ 	RING_API_REGISTER("ring_state_stringtokens", ring_vm_generallib_state_stringtokens);
+ 	RING_API_REGISTER("ring_state_scannererror", ring_vm_generallib_state_scannererror);
+ 	RING_API_REGISTER("ring_state_runcodeatins", ring_vm_generallib_state_runcodeatins);
+ 	RING_API_REGISTER("ring_state_resume", ring_vm_generallib_state_resume);
++	*/
 ```
 
-### 6. `src/ring/src/file_e.c` — Disable unsupported file ops
+Comment out the Date/Time registrations:
 
-Wrap with `#if !RING_VM_MRE` / `#endif`:
-
-```c
-#if !RING_VM_MRE
-	RING_API_REGISTER("tempfile", ring_vm_file_tempfile);
-#endif
+```diff
+ 	/* Date and Time */
+-	RING_API_REGISTER("clock", ring_vm_generallib_clock);
+-	RING_API_REGISTER("clockspersecond", ring_vm_generallib_clockspersecond);
+-	RING_API_REGISTER("time", ring_vm_generallib_time);
+-	RING_API_REGISTER("timelist", ring_vm_generallib_timelist);
+-	RING_API_REGISTER("date", ring_vm_generallib_date);
+-	RING_API_REGISTER("adddays", ring_vm_generallib_adddays);
+-	RING_API_REGISTER("diffdays", ring_vm_generallib_diffdays);
++	// RING_API_REGISTER("clock", ring_vm_generallib_clock);
++	// RING_API_REGISTER("clockspersecond", ring_vm_generallib_clockspersecond);
++	// RING_API_REGISTER("time", ring_vm_generallib_time);
++	// RING_API_REGISTER("timelist", ring_vm_generallib_timelist);
++	// RING_API_REGISTER("date", ring_vm_generallib_date);
++	// RING_API_REGISTER("adddays", ring_vm_generallib_adddays);
++	// RING_API_REGISTER("diffdays", ring_vm_generallib_diffdays);
 ```
 
-```c
-#if !RING_VM_MRE
-	RING_API_REGISTER("rename", ring_vm_file_rename);
-	RING_API_REGISTER("remove", ring_vm_file_remove);
-#endif
-```
-
-**Why:** `tmpfile()`, `rename()`, `remove()` don't exist on MRE bare-metal.
-
-### 7. Delete non-MRE source files
-
-Delete these from `src/ring/src/` (they're in upstream but not needed for MRE):
-- `dll_e.c` — DLL loading (no shared libraries on MRE)
-- `meta_e.c` — Reflection (disabled via `RING_VM_REFMETA 0`)
-- `vminfo_e.c` — VM info (disabled via `RING_VM_INFO 0`)
-- `os_e.c` — OS functions (disabled via `RING_VM_OS 0`)
-- `ring.c` — Standalone main() entry point
-- `ringw.c` — Windows main() entry point
-
-## Files we own (never in upstream)
-
-These files are MRE-specific and are never overwritten by upstream updates:
-- `src/ring/src/mre_e.c` — MRE extension implementation
-- `src/ring/include/mre_e.h` — MRE extension header
-- `src/ring/include/rconfig.h` — MRE configuration overrides
-
-## When upgrading Ring
+## 7. Delete non-MRE source files
 
 ```bash
-# 1. Copy upstream files
-cp ringsrc/language/src/*.c src/ring/src/
-cp ringsrc/language/include/*.h src/ring/include/
-
-# 2. Restore our files (overwritten by step 1)
-git checkout src/ring/include/rconfig.h
-
-# 3. Re-apply patches 2–6
-
-# 4. Delete non-MRE files
-rm src/ring/src/{dll_e.c,meta_e.c,vminfo_e.c,os_e.c,ring.c,ringw.c}
-
-# 5. Build and fix any new issues
-make clean && make
+rm src/ring/src/dll_e.c
+rm src/ring/src/meta_e.c
+rm src/ring/src/vminfo_e.c
+rm src/ring/src/ring.c
+rm src/ring/src/ringw.c
 ```
 
-All patches are `#if`/`#ifndef` wraps around existing lines — no deletions or rewrites. New linker errors after an upgrade mean a new function was added that needs a guard.
+## Files we own (not in upstream)
 
-## Summary of changes vs upstream
+- `src/ring/src/mre_e.c`
+- `src/ring/include/mre_e.h`
+- `src/ring/include/rconfig.h`
 
-| File | Change | Survives update? |
-|---|---|---|
-| `rconfig.h` | All MRE flag overrides | ✅ `git checkout` after copy |
-| `ext.h` | `#define` → `#ifndef` (3 macros) | ⚠️ Re-apply |
-| `ring.h` | `#include "mre_e.h"` (3 lines) | ⚠️ Re-apply |
-| `ext.c` | MRE load call (3 lines) | ⚠️ Re-apply |
-| `file_e.c` | `#if !RING_VM_MRE` wraps (3 functions) | ⚠️ Re-apply |
-| `genlib_e.c` | `#if !RING_VM_MRE` wraps (4 sections) | ⚠️ Re-apply |
-| `mre_e.c` / `mre_e.h` | MRE-only files | ✅ Never in upstream |
+Restore these after copying upstream files.
