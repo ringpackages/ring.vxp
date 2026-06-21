@@ -22,10 +22,6 @@ void ring_vm_extension(RingState *pRingState) {
 #if RING_VM_OS
 	ring_vm_os_loadfunctions(pRingState);
 #endif
-/* DLL */
-#if RING_VM_DLL
-	ring_vm_dll_loadfunctions(pRingState);
-#endif
 /* Reflection and Meta-programming */
 #if RING_VM_REFMETA
 	ring_vm_refmeta_loadfunctions(pRingState);
